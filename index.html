@@ -57,9 +57,11 @@
       <button onclick="createChannelPrompt()">Создать канал</button>
       <button id="my-channel-btn" style="display:none;" onclick="enterChannel(myChannelId)">Мой канал</button>
     </div>
+<input id="search" placeholder="Поиск по имени канала" oninput="searchChannels()">
     <h4>Каналы:</h4>
     <div id="channel-list"></div>
   </div>
+
 
   <div class="container" id="channel-page" style="display:none;">
     <div style="text-align:center">
@@ -176,6 +178,22 @@
           div.onclick = () => enterChannel(doc.id);
           div.innerHTML = `<img src="${data.avatar || 'https://via.placeholder.com/40'}"><div>${data.name}</div>`;
           channelList.appendChild(div);
+        });
+      });
+    }
+function searchChannels() {
+      const query = document.getElementById("search").value.toLowerCase();
+      channelList.innerHTML = "";
+      db.collection("channels").get().then(snap => {
+        snap.forEach(doc => {
+          const data = doc.data();
+          if (data.name.toLowerCase().includes(query)) {
+            const div = document.createElement("div");
+            div.className = "channel";
+            div.onclick = () => enterChannel(doc.id);
+            div.innerHTML = `<img src="${data.avatar || 'https://via.placeholder.com/40'}"><div>${data.name}</div>`;
+            channelList.appendChild(div);
+          }
         });
       });
     }
