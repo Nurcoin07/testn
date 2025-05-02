@@ -1,88 +1,77 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>AniMedia Channels</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: black;
-      color: white;
-    }
-    .overlay {
-      padding: 20px;
-      max-width: 400px;
-      margin: 20px auto;
-      background: rgba(0,0,0,0.7);
-      border-radius: 10px;
-    }
+    body { margin: 0; background: #000; color: #fff; font-family: sans-serif; }
+    .container { max-width: 400px; margin: auto; padding: 20px; }
     input, button {
-      width: 100%;
-      padding: 10px;
-      margin: 8px 0;
-      border-radius: 5px;
-      border: none;
+      width: 100%; margin: 6px 0; padding: 10px;
+      border-radius: 5px; border: none;
     }
-    button {
-      background-color: red;
-      color: white;
-      cursor: pointer;
-    }
-    #logout {
-      background-color: darkred;
-    }
+    button { background: crimson; color: #fff; cursor: pointer; }
     .channel {
-      border-bottom: 1px solid gray;
-      padding: 10px;
+      background: #111; padding: 10px; margin: 5px 0;
+      display: flex; align-items: center; border-radius: 5px;
       cursor: pointer;
+    }
+    .channel img {
+      width: 40px; height: 40px; object-fit: cover;
+      border-radius: 50%; margin-right: 10px;
     }
     .post {
-      padding: 10px;
-      border-bottom: 1px solid #555;
+      background: #111; padding: 10px; margin: 10px 0;
+      border-radius: 5px;
     }
-    img {
-      max-width: 100%;
-      margin-top: 10px;
+    .post img {
+      max-width: 100%; margin-top: 10px;
+    }
+    .delete-btn {
+      background: darkred; margin-top: 5px;
     }
   </style>
 </head>
 <body>
-  <div class="overlay" id="auth-section">
+  <div class="container" id="auth">
     <h2>AniMedia</h2>
-    <input id="username" type="text" placeholder="Username" />
-    <input id="email" type="email" placeholder="Email" />
-    <input id="password" type="password" placeholder="Password" />
-    <button onclick="login()">Login</button>
-    <button onclick="register()">Register</button>
+    <input id="email" type="email" placeholder="Email">
+    <input id="pass" type="password" placeholder="Password">
+    <input id="username" placeholder="Username (только при регистрации)">
+    <button onclick="login()">Войти</button>
+    <button onclick="register()">Регистрация</button>
   </div>
 
-  <div class="overlay" id="welcome-section" style="display:none;">
-    <h2>Welcome, <span id="user-email"></span></h2>
-    <button onclick="logout()" id="logout">Logout</button>
-    <button id="create-channel" onclick="createChannel()">Create Channel</button>
-    <button id="my-channel" onclick="enterChannel(myChannelId)" style="display:none;">My Channel</button>
-  </div>
-
-  <div class="overlay" id="channel-list-section" style="display:none;">
-    <h3>Channels</h3>
+  <div class="container" id="app" style="display:none;">
+    <h3>Привет, <span id="user-email"></span></h3>
+    <button onclick="logout()">Выйти</button>
+    <div id="channel-section">
+      <button onclick="createChannelPrompt()">Создать канал</button>
+      <button id="my-channel-btn" style="display:none;" onclick="enterChannel(myChannelId)">Мой канал</button>
+    </div>
+    <h4>Каналы:</h4>
     <div id="channel-list"></div>
   </div>
 
-  <div class="overlay" id="channel-section" style="display:none;">
-    <h3 id="channel-title"></h3>
-    <p><span id="subscriber-count"></span> subscribers</p>
-    <button id="subscribe-btn" onclick="subscribe()">Subscribe</button>
-    <div id="post-inputs" style="display:none;">
-      <input id="post-text" placeholder="Message" />
-      <input id="post-img" placeholder="Image URL (optional)" />
-      <button onclick="sendPost()">Send</button>
+  <div class="container" id="channel-page" style="display:none;">
+    <div style="text-align:center">
+      <img id="channel-avatar" style="width:100px;height:100px;border-radius:50%;object-fit:cover"><br>
+      <h3 id="channel-title"></h3>
+      <p><span id="sub-count"></span> подписчиков</p>
+      <button id="sub-btn" onclick="subscribe()">Подписаться</button>
+      <button id="delete-channel-btn" class="delete-btn" onclick="deleteChannel()" style="display:none;">Удалить канал</button>
+    </div>
+    <div id="post-form" style="display:none;">
+      <input id="post-text" placeholder="Текст поста">
+      <input id="post-img" placeholder="Ссылка на изображение (необязательно)">
+      <button onclick="sendPost()">Опубликовать</button>
     </div>
     <div id="post-list"></div>
+    <button onclick="back()">Назад</button>
   </div>
 
   <script>
@@ -96,28 +85,37 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
+    const authBox = document.getElementById("auth");
+    const appBox = document.getElementById("app");
+    const email = document.getElementById("email");
+    const pass = document.getElementById("pass");
+    const username = document.getElementById("username");
+    const userEmail = document.getElementById("user-email");
+    const channelList = document.getElementById("channel-list");
+    const myChannelBtn = document.getElementById("my-channel-btn");
+    const channelPage = document.getElementById("channel-page");
+    const postForm = document.getElementById("post-form");
+    const postList = document.getElementById("post-list");
+    const deleteChannelBtn = document.getElementById("delete-channel-btn");
+
     let currentUserId = null;
     let myChannelId = null;
-    let viewingChannelId = null;
+    let currentChannel = null;
+    let currentChannelOwner = null;
 
     function register() {
-      const email = emailEl.value;
-      const password = passwordEl.value;
-      const username = usernameEl.value;
-      if (!username) return alert("Enter username");
-      auth.createUserWithEmailAndPassword(email, password)
+      auth.createUserWithEmailAndPassword(email.value, pass.value)
         .then(cred => {
           db.collection("users").doc(cred.user.uid).set({
-            email: email,
-            username: username
+            email: email.value,
+            username: username.value
           });
-        })
-        .catch(e => alert("Registration error: " + e.message));
+        }).catch(e => alert(e.message));
     }
 
     function login() {
-      auth.signInWithEmailAndPassword(emailEl.value, passwordEl.value)
-        .catch(e => alert("Login error: " + e.message));
+      auth.signInWithEmailAndPassword(email.value, pass.value)
+        .catch(e => alert(e.message));
     }
 
     function logout() {
@@ -127,139 +125,144 @@
     auth.onAuthStateChanged(async user => {
       if (user) {
         currentUserId = user.uid;
-        emailEl.value = passwordEl.value = usernameEl.value = "";
-        authSection.style.display = "none";
-        welcomeSection.style.display = "block";
-        channelListSection.style.display = "block";
+        authBox.style.display = "none";
+        appBox.style.display = "block";
         userEmail.textContent = user.email;
 
-        // Check for own channel
         const channelSnap = await db.collection("channels").where("owner", "==", currentUserId).get();
         if (!channelSnap.empty) {
           myChannelId = channelSnap.docs[0].id;
-          createChannelBtn.style.display = "none";
-          myChannelBtn.style.display = "inline-block";
+          myChannelBtn.style.display = "block";
         }
+
         loadChannels();
       } else {
-        currentUserId = null;
-        authSection.style.display = "block";
-        welcomeSection.style.display = "none";
-        channelListSection.style.display = "none";
-        channelSection.style.display = "none";
+        authBox.style.display = "block";
+        appBox.style.display = "none";
+        channelPage.style.display = "none";
+        myChannelId = null;
       }
     });
 
-    function createChannel() {
-      const name = prompt("Channel name:");
-      if (!name) return;
-      db.collection("channels").add({
-        name,
-        owner: currentUserId,
-        subscribers: []
-      }).then(doc => {
-        myChannelId = doc.id;
-        createChannelBtn.style.display = "none";
-        myChannelBtn.style.display = "inline-block";
-        enterChannel(myChannelId);
-      });
+    function createChannelPrompt() {
+      const name = prompt("Название канала:");
+      const avatar = prompt("Ссылка на аватарку (необязательно):") || "";
+      if (name) {
+        db.collection("channels").add({
+          name,
+          avatar,
+          owner: currentUserId,
+          subscribers: []
+        }).then(doc => {
+          myChannelId = doc.id;
+          myChannelBtn.style.display = "block";
+          loadChannels();
+        });
+      }
     }
 
     function loadChannels() {
-      channelList.innerHTML = "Loading...";
-      db.collection("channels").get().then(snapshot => {
-        channelList.innerHTML = "";
-        snapshot.forEach(doc => {
-          const c = doc.data();
-          channelList.innerHTML += `
-            <div class="channel" onclick="enterChannel('${doc.id}')">
-              <strong>${c.name}</strong>
-            </div>`;
+      channelList.innerHTML = "";
+      db.collection("channels").get().then(snap => {
+        snap.forEach(doc => {
+          const data = doc.data();
+          const div = document.createElement("div");
+          div.className = "channel";
+          div.onclick = () => enterChannel(doc.id);
+          div.innerHTML = `<img src="${data.avatar || 'https://via.placeholder.com/40'}"><div>${data.name}</div>`;
+          channelList.appendChild(div);
         });
       });
     }
 
-    async function enterChannel(id) {
-      viewingChannelId = id;
-      const doc = await db.collection("channels").doc(id).get();
-      const channel = doc.data();
-      channelTitle.textContent = channel.name;
-      channelSection.style.display = "block";
-      postList.innerHTML = "Loading...";
-      postInputs.style.display = (channel.owner === currentUserId) ? "block" : "none";
+    function enterChannel(id) {
+      appBox.style.display = "none";
+      channelPage.style.display = "block";
+      currentChannel = id;
 
-      // Subscribe btn
-      const isSubscribed = (channel.subscribers || []).includes(currentUserId);
-      subscribeBtn.textContent = isSubscribed ? "Unsubscribe" : "Subscribe";
-      subscriberCount.textContent = (channel.subscribers || []).length;
+      db.collection("channels").doc(id).get().then(doc => {
+        const data = doc.data();
+        document.getElementById("channel-avatar").src = data.avatar || 'https://via.placeholder.com/100';
+        document.getElementById("channel-title").textContent = data.name;
+        document.getElementById("sub-count").textContent = data.subscribers.length;
+        currentChannelOwner = data.owner;
 
-      loadPosts();
-    }
+        if (currentUserId === data.owner) {
+          postForm.style.display = "block";
+          deleteChannelBtn.style.display = "block";
+          document.getElementById("sub-btn").style.display = "none";
+        } else {
+          postForm.style.display = "none";
+          deleteChannelBtn.style.display = "none";
+          document.getElementById("sub-btn").style.display = "block";
+        }
 
-    function loadPosts() {
-      postList.innerHTML = "";
-      db.collection("channels").doc(viewingChannelId).collection("posts")
-        .orderBy("timestamp", "desc")
-        .get().then(snapshot => {
-          snapshot.forEach(doc => {
-            const p = doc.data();
-            postList.innerHTML += `
-              <div class="post">
-                <p>${p.text}</p>
-                ${p.image ? `<img src="${p.image}" />` : ""}
-              </div>`;
-          });
-        });
-    }
-
-    function sendPost() {
-      const text = postText.value;
-      const image = postImg.value;
-      if (!text) return alert("Enter message");
-      db.collection("channels").doc(viewingChannelId).collection("posts").add({
-        text,
-        image: image || null,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      }).then(() => {
-        postText.value = "";
-        postImg.value = "";
         loadPosts();
       });
     }
 
     function subscribe() {
-      const ref = db.collection("channels").doc(viewingChannelId);
-      ref.get().then(doc => {
-        const subs = doc.data().subscribers || [];
-        if (subs.includes(currentUserId)) {
-          ref.update({ subscribers: subs.filter(uid => uid !== currentUserId) });
-        } else {
-          subs.push(currentUserId);
-          ref.update({ subscribers: subs });
-        }
-        enterChannel(viewingChannelId);
+      db.collection("channels").doc(currentChannel).update({
+        subscribers: firebase.firestore.FieldValue.arrayUnion(currentUserId)
+      }).then(() => alert("Вы подписались!"));
+    }
+
+    function sendPost() {
+      const text = document.getElementById("post-text").value;
+      const img = document.getElementById("post-img").value;
+      if (text) {
+        db.collection("channels").doc(currentChannel).collection("posts").add({
+          text, img, created: Date.now()
+        }).then(() => {
+          document.getElementById("post-text").value = "";
+          document.getElementById("post-img").value = "";
+          loadPosts();
+        });
+      }
+    }
+
+    function loadPosts() {
+      postList.innerHTML = "";
+      db.collection("channels").doc(currentChannel).collection("posts").orderBy("created", "desc").get().then(snap => {
+        snap.forEach(doc => {
+          const data = doc.data();
+          const div = document.createElement("div");
+          div.className = "post";
+          div.innerHTML = `<div>${data.text}</div>${data.img ? `<img src="${data.img}">` : ""}`;
+          if (currentUserId === currentChannelOwner) {
+            const del = document.createElement("button");
+            del.className = "delete-btn";
+            del.textContent = "Удалить пост";
+            del.onclick = () => {
+              db.collection("channels").doc(currentChannel).collection("posts").doc(doc.id).delete().then(loadPosts);
+            };
+            div.appendChild(del);
+          }
+          postList.appendChild(div);
+        });
       });
     }
 
-    // DOM elements shortcut
-    const authSection = document.getElementById("auth-section");
-    const emailEl = document.getElementById("email");
-    const passwordEl = document.getElementById("password");
-    const usernameEl = document.getElementById("username");
-    const welcomeSection = document.getElementById("welcome-section");
-    const userEmail = document.getElementById("user-email");
-    const createChannelBtn = document.getElementById("create-channel");
-    const myChannelBtn = document.getElementById("my-channel");
-    const channelListSection = document.getElementById("channel-list-section");
-    const channelList = document.getElementById("channel-list");
-    const channelSection = document.getElementById("channel-section");
-    const channelTitle = document.getElementById("channel-title");
-    const subscriberCount = document.getElementById("subscriber-count");
-    const subscribeBtn = document.getElementById("subscribe-btn");
-    const postInputs = document.getElementById("post-inputs");
-    const postText = document.getElementById("post-text");
-    const postImg = document.getElementById("post-img");
-    const postList = document.getElementById("post-list");
+    function deleteChannel() {
+      if (confirm("Удалить канал и все посты?")) {
+        db.collection("channels").doc(currentChannel).collection("posts").get().then(snap => {
+          const batch = db.batch();
+          snap.forEach(doc => batch.delete(doc.ref));
+          batch.commit().then(() => {
+            db.collection("channels").doc(currentChannel).delete().then(() => {
+              back();
+              loadChannels();
+              alert("Канал удалён");
+            });
+          });
+        });
+      }
+    }
+
+    function back() {
+      channelPage.style.display = "none";
+      appBox.style.display = "block";
+    }
   </script>
 </body>
 </html>
