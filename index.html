@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AniMedia Channels</title>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: black;
+      color: white;
+    }
+    .overlay {
+      padding: 20px;
+      max-width: 400px;
+      margin: 20px auto;
+      background: rgba(0,0,0,0.7);
+      border-radius: 10px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 5px;
+      border: none;
+    }
+    button {
+      background-color: red;
+      color: white;
+      cursor: pointer;
+    }
+    #logout {
+      background-color: darkred;
+    }
+    .channel {
+      border-bottom: 1px solid gray;
+      padding: 10px;
+      cursor: pointer;
+    }
+    .post {
+      padding: 10px;
+      border-bottom: 1px solid #555;
+    }
+    img {
+      max-width: 100%;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay" id="auth-section">
+    <h2>AniMedia</h2>
+    <input id="username" type="text" placeholder="Username" />
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <button onclick="register()">Register</button>
+  </div>
+
+  <div class="overlay" id="welcome-section" style="display:none;">
+    <h2>Welcome, <span id="user-email"></span></h2>
+    <button onclick="logout()" id="logout">Logout</button>
+    <button id="create-channel" onclick="createChannel()">Create Channel</button>
+    <button id="my-channel" onclick="enterChannel(myChannelId)" style="display:none;">My Channel</button>
+  </div>
+
+  <div class="overlay" id="channel-list-section" style="display:none;">
+    <h3>Channels</h3>
+    <div id="channel-list"></div>
+  </div>
+
+  <div class="overlay" id="channel-section" style="display:none;">
+    <h3 id="channel-title"></h3>
+    <p><span id="subscriber-count"></span> subscribers</p>
+    <button id="subscribe-btn" onclick="subscribe()">Subscribe</button>
+    <div id="post-inputs" style="display:none;">
+      <input id="post-text" placeholder="Message" />
+      <input id="post-img" placeholder="Image URL (optional)" />
+      <button onclick="sendPost()">Send</button>
+    </div>
+    <div id="post-list"></div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBpYjMmOiSSoItRuS9guy2c5KSH9y5DBmc",
+      authDomain: "network-my.firebaseapp.com",
+      projectId: "network-my",
+      appId: "1:300961970076:web:08142c2382a3fb8e38fa59"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUserId = null;
+    let myChannelId = null;
+    let viewingChannelId = null;
+
+    function register() {
+      const email = emailEl.value;
+      const password = passwordEl.value;
+      const username = usernameEl.value;
+      if (!username) return alert("Enter username");
+      auth.createUserWithEmailAndPassword(email, password)
+        .then(cred => {
+          db.collection("users").doc(cred.user.uid).set({
+            email: email,
+            username: username
+          });
+        })
+        .catch(e => alert("Registration error: " + e.message));
+    }
+
+    function login() {
+      auth.signInWithEmailAndPassword(emailEl.value, passwordEl.value)
+        .catch(e => alert("Login error: " + e.message));
+    }
+
+    function logout() {
+      auth.signOut();
+    }
+
+    auth.onAuthStateChanged(async user => {
+      if (user) {
+        currentUserId = user.uid;
+        emailEl.value = passwordEl.value = usernameEl.value = "";
+        authSection.style.display = "none";
+        welcomeSection.style.display = "block";
+        channelListSection.style.display = "block";
+        userEmail.textContent = user.email;
+
+        // Check for own channel
+        const channelSnap = await db.collection("channels").where("owner", "==", currentUserId).get();
+        if (!channelSnap.empty) {
+          myChannelId = channelSnap.docs[0].id;
+          createChannelBtn.style.display = "none";
+          myChannelBtn.style.display = "inline-block";
+        }
+        loadChannels();
+      } else {
+        currentUserId = null;
+        authSection.style.display = "block";
+        welcomeSection.style.display = "none";
+        channelListSection.style.display = "none";
+        channelSection.style.display = "none";
+      }
+    });
+
+    function createChannel() {
+      const name = prompt("Channel name:");
+      if (!name) return;
+      db.collection("channels").add({
+        name,
+        owner: currentUserId,
+        subscribers: []
+      }).then(doc => {
+        myChannelId = doc.id;
+        createChannelBtn.style.display = "none";
+        myChannelBtn.style.display = "inline-block";
+        enterChannel(myChannelId);
+      });
+    }
+
+    function loadChannels() {
+      channelList.innerHTML = "Loading...";
+      db.collection("channels").get().then(snapshot => {
+        channelList.innerHTML = "";
+        snapshot.forEach(doc => {
+          const c = doc.data();
+          channelList.innerHTML += `
+            <div class="channel" onclick="enterChannel('${doc.id}')">
+              <strong>${c.name}</strong>
+            </div>`;
+        });
+      });
+    }
+
+    async function enterChannel(id) {
+      viewingChannelId = id;
+      const doc = await db.collection("channels").doc(id).get();
+      const channel = doc.data();
+      channelTitle.textContent = channel.name;
+      channelSection.style.display = "block";
+      postList.innerHTML = "Loading...";
+      postInputs.style.display = (channel.owner === currentUserId) ? "block" : "none";
+
+      // Subscribe btn
+      const isSubscribed = (channel.subscribers || []).includes(currentUserId);
+      subscribeBtn.textContent = isSubscribed ? "Unsubscribe" : "Subscribe";
+      subscriberCount.textContent = (channel.subscribers || []).length;
+
+      loadPosts();
+    }
+
+    function loadPosts() {
+      postList.innerHTML = "";
+      db.collection("channels").doc(viewingChannelId).collection("posts")
+        .orderBy("timestamp", "desc")
+        .get().then(snapshot => {
+          snapshot.forEach(doc => {
+            const p = doc.data();
+            postList.innerHTML += `
+              <div class="post">
+                <p>${p.text}</p>
+                ${p.image ? `<img src="${p.image}" />` : ""}
+              </div>`;
+          });
+        });
+    }
+
+    function sendPost() {
+      const text = postText.value;
+      const image = postImg.value;
+      if (!text) return alert("Enter message");
+      db.collection("channels").doc(viewingChannelId).collection("posts").add({
+        text,
+        image: image || null,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => {
+        postText.value = "";
+        postImg.value = "";
+        loadPosts();
+      });
+    }
+
+    function subscribe() {
+      const ref = db.collection("channels").doc(viewingChannelId);
+      ref.get().then(doc => {
+        const subs = doc.data().subscribers || [];
+        if (subs.includes(currentUserId)) {
+          ref.update({ subscribers: subs.filter(uid => uid !== currentUserId) });
+        } else {
+          subs.push(currentUserId);
+          ref.update({ subscribers: subs });
+        }
+        enterChannel(viewingChannelId);
+      });
+    }
+
+    // DOM elements shortcut
+    const authSection = document.getElementById("auth-section");
+    const emailEl = document.getElementById("email");
+    const passwordEl = document.getElementById("password");
+    const usernameEl = document.getElementById("username");
+    const welcomeSection = document.getElementById("welcome-section");
+    const userEmail = document.getElementById("user-email");
+    const createChannelBtn = document.getElementById("create-channel");
+    const myChannelBtn = document.getElementById("my-channel");
+    const channelListSection = document.getElementById("channel-list-section");
+    const channelList = document.getElementById("channel-list");
+    const channelSection = document.getElementById("channel-section");
+    const channelTitle = document.getElementById("channel-title");
+    const subscriberCount = document.getElementById("subscriber-count");
+    const subscribeBtn = document.getElementById("subscribe-btn");
+    const postInputs = document.getElementById("post-inputs");
+    const postText = document.getElementById("post-text");
+    const postImg = document.getElementById("post-img");
+    const postList = document.getElementById("post-list");
+  </script>
+</body>
+</html>
