@@ -7,12 +7,12 @@
   "theme_color": "#317EFB",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "https://avatars.mds.yandex.net/i?id=148a5a5531e1112194ecfd96ba80c241_l-5100139-images-thumbs&n=13",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "icon-512.png",
+      "src": "https://avatars.mds.yandex.net/i?id=148a5a5531e1112194ecfd96ba80c241_l-5100139-images-thumbs&n=13",
       "sizes": "512x512",
       "type": "image/png"
     }
