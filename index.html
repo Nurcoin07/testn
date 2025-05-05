@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <link rel="manifest" href="manifest.json">
+ <meta name="theme-color" content="#000000">
   <meta charset="UTF-8" />
   <title>AniMedia Channels</title>
   <link rel="icon" href="https://cdn.ananasposter.ru/image/cache/catalog/poster/pos23/23/68469-1000x830.jpg" type="image/png">
@@ -46,6 +48,21 @@
     }
   </style>
 </head>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/onlineshopping.com/sw.js').then(reg => {
+        setInterval(() => reg.update(), 30000);
+        reg.onupdatefound = () => {
+          const newWorker = reg.installing;
+          newWorker.onstatechange = () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              window.location.reload();
+            }
+          };
+        };
+      });
+    }
+  </script>
 <body>
 
   <div class="container" id="auth">
