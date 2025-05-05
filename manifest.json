@@ -1,7 +1,7 @@
 {
-  "name": "Онлайн Магазин",
-  "short_name": "Магазин",
-  "start_url": "/onlineshopping.com/index.html",
+  "name": "AniMedia",
+  "short_name": "AniMedia",
+  "start_url": "/testn/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#317EFB",
