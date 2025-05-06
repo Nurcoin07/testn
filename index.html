@@ -72,6 +72,7 @@
     <input id="username" placeholder="Username (только при регистрации)">
     <button onclick="login()">Войти</button>
     <button onclick="register()">Регистрация</button>
+<button onclick="anonymousLogin()">Login Anonymously</button>
   </div>
 <div id="home" class="page active">
 
@@ -139,10 +140,10 @@ function showPage(pageId) {
       document.getElementById(pageId).classList.add('active');
     }
     const firebaseConfig = {
-      apiKey: "AIzaSyBpYjMmOiSSoItRuS9guy2c5KSH9y5DBmc",
-      authDomain: "network-my.firebaseapp.com",
-      projectId: "network-my",
-      appId: "1:300961970076:web:08142c2382a3fb8e38fa59"
+      apiKey: "AIzaSyCjGhNZoxYpDhnQlw9MWdjekTc1--YNtoU",
+  authDomain: "nurnetwork-my.firebaseapp.com",
+  projectId: "nurnetwork-my",
+  appId: "1:227753245575:web:e6194d86e2a75d9d923122"
     };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -180,6 +181,11 @@ function showPage(pageId) {
       auth.signInWithEmailAndPassword(email.value, pass.value)
         .catch(e => alert(e.message));
     }
+async function anonymousLogin() {
+    const { user } = await auth.signInAnonymously();
+    await db.collection('users').doc(user.uid).set({ username: 'Guest_' + user.uid.slice(-4), subscribers: 0 });
+    init();
+  }
 
     function logout() {
       auth.signOut();
